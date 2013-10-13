@@ -817,7 +817,8 @@ void rtsp_listen_loop(void) {
             maxfd = sockfd[i];
     }
 
-    mdns_register();
+    if (!config.no_mdns)
+        mdns_register();
 
     printf("Listening for connections.\n");
     shairport_startup_complete();

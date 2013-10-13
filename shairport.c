@@ -101,6 +101,8 @@ void usage(char *progname) {
 
     printf("    -o, --output=BACKEND    select audio output method\n");
 
+    printf("    -n, --no-mdns       don't publish via Multicast DNS\n");
+
     printf("\n");
     audio_ls_outputs();
 }
@@ -120,12 +122,13 @@ int parse_options(int argc, char **argv) {
         {"output",  required_argument,  NULL, 'o'},
         {"on-start",required_argument,  NULL, 'B'},
         {"on-stop", required_argument,  NULL, 'E'},
+        {"no-mdns", no_argument,        NULL, 'n'},
         {NULL, 0, NULL, 0}
     };
 
     int opt;
     while ((opt = getopt_long(argc, argv,
-                              "+hdvP:l:e:p:a:o:b:B:E:",
+                              "+hdvP:l:e:p:a:o:b:B:E:n",
                               long_options, NULL)) > 0) {
         switch (opt) {
             default:
@@ -164,6 +167,9 @@ int parse_options(int argc, char **argv) {
                 break;
             case 'e':
                 config.errfile = optarg;
+                break;
+            case 'n':
+                config.no_mdns = 1;
                 break;
         }
     }

@@ -30,6 +30,7 @@ typedef struct {
     char *pidfile;
     char *logfile;
     char *errfile;
+    int no_mdns;
 } shairport_cfg;
 
 extern int debuglev;
