@@ -102,6 +102,7 @@ void usage(char *progname) {
     printf("    -o, --output=BACKEND    select audio output method\n");
 
     printf("    -n, --no-mdns       don't publish via Multicast DNS\n");
+    printf("    -H, --hw-addr=ADDR  use ADDR as hardware address\n");
 
     printf("\n");
     audio_ls_outputs();
@@ -123,13 +124,15 @@ int parse_options(int argc, char **argv) {
         {"on-start",required_argument,  NULL, 'B'},
         {"on-stop", required_argument,  NULL, 'E'},
         {"no-mdns", no_argument,        NULL, 'n'},
+        {"hw-addr", required_argument,  NULL, 'H'},
         {NULL, 0, NULL, 0}
     };
 
     int opt;
     while ((opt = getopt_long(argc, argv,
-                              "+hdvP:l:e:p:a:o:b:B:E:n",
+                              "+hdvnP:l:e:p:a:o:b:B:E:H:",
                               long_options, NULL)) > 0) {
+        int i, len;
         switch (opt) {
             default:
             case 'h':
@@ -170,6 +173,16 @@ int parse_options(int argc, char **argv) {
                 break;
             case 'n':
                 config.no_mdns = 1;
+                break;
+            case 'H':
+                len = strlen(optarg);
+                if (len == sizeof(config.hw_addr) * 2) {
+                    for (i=0; i<sizeof(config.hw_addr); i++) {
+                        sscanf(optarg+(i*2), "%2hhx", &config.hw_addr[i]);
+                    }                
+		} else {
+                    warn("passed hardware address of %d bytes, wanted %d", len, sizeof(config.hw_addr) * 2);
+                }
                 break;
         }
     }
@@ -277,12 +290,15 @@ int main(int argc, char **argv) {
     }
     config.output->init(argc-audio_arg, argv+audio_arg);
 
-    uint8_t ap_md5[16];
-    MD5_CTX ctx;
-    MD5_Init(&ctx);
-    MD5_Update(&ctx, config.apname, strlen(config.apname));
-    MD5_Final(ap_md5, &ctx);
-    memcpy(config.hw_addr, ap_md5, sizeof(config.hw_addr));
+    // check if hw_addr is still initial 
+    if (strcmp(base64_enc(config.hw_addr, 6), "AAAAAAA") == 0) {
+        uint8_t ap_md5[16];
+        MD5_CTX ctx;
+        MD5_Init(&ctx);
+        MD5_Update(&ctx, config.apname, strlen(config.apname));
+        MD5_Final(ap_md5, &ctx);
+        memcpy(config.hw_addr, ap_md5, sizeof(config.hw_addr));
+    }
 
 
     rtsp_listen_loop();
