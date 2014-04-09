@@ -32,8 +32,13 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include "config.h"
 #include "common.h"
 #include "player.h"
+#ifdef MACH_TIME
+#include <mach/mach.h>
+#include <mach/clock.h>
+#endif
 
 #define NTPCACHESIZE 7
 
@@ -49,6 +54,23 @@ static pthread_t rtp_thread;
 static pthread_t ntp_receive_thread;
 static pthread_t ntp_send_thread;
 long long ntp_cache[NTPCACHESIZE + 1];
+
+static void get_current_time(struct timespec *tsp) {
+#ifdef MACH_TIME
+    kern_return_t retval = KERN_SUCCESS;
+    clock_serv_t cclock;
+    mach_timespec_t mts;
+
+    host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &cclock);
+    retval = clock_get_time(cclock, &mts);
+    mach_port_deallocate(mach_task_self(), cclock);
+
+    tsp->tv_sec = mts.tv_sec;
+    tsp->tv_nsec = mts.tv_nsec;
+#else
+    clock_gettime(CLOCK_MONOTONIC, tsp);
+#endif
+}
 
 static void reset_ntp_cache() {
     int i;
@@ -117,7 +139,7 @@ static long long tspk_to_us(struct timespec tspk) {
 
 long long tstp_us() {
     struct timespec tv;
-    clock_gettime(CLOCK_MONOTONIC, &tv);
+    get_current_time(&tv);
     return tspk_to_us(tv);
 }
 
@@ -212,7 +234,7 @@ static void *ntp_receiver(void *arg) {
         nread = recv(timing_sock, packet, sizeof(packet), 0);
         if (nread < 0)
             break;
-        clock_gettime(CLOCK_MONOTONIC, &tv);
+        get_current_time(&tv);
 
         ssize_t plen = nread;
         uint8_t type = packet[1] & ~0x80;
@@ -261,7 +283,7 @@ static void send_timing_packet(int max_delay_time_ms) {
     req[1] = 0x52|0x80;  // Apple 'ntp request'
     *(uint16_t *)(req+2) = htons(7);  // seq no, needs to be 7 or iTunes won't respond
 
-    clock_gettime(CLOCK_MONOTONIC, &tv);
+    get_current_time(&tv);
     *(uint32_t *)(req+24) = htonl((uint32_t)tv.tv_sec);
     *(uint32_t *)(req+28) = htonl((uint32_t)tv.tv_nsec * 0x100000000 / (1000 * 1000 * 1000));
 
