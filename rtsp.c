@@ -460,22 +460,22 @@ cleanup_handle_setup:
 
 static void handle_record(rtsp_conn_info *conn,
                          rtsp_message *req, rtsp_message *resp) {
-    int seq;
-    unsigned long rtptime;
+    int seq = -1;
+    unsigned long rtptime = 0;
     char *hdr = msg_get_header(req, "RTP-Info");
-    if (!hdr)
-        return;
-    char *p;
-    p = strstr(hdr, "seq=");
-    if (!p)
-        return;
-    p = strchr(p, '=') + 1;
-    seq = atoi(p);
-    p = strstr(hdr, "rtptime=");
-    if (!p)
-        return;
-    p = strchr(p, '=') + 1;
-    rtptime = strtoul(p, NULL, 0);
+    if (hdr) {
+        char *p;
+        p = strstr(hdr, "seq=");
+        if (!p)
+            return;
+        p = strchr(p, '=') + 1;
+        seq = atoi(p);
+        p = strstr(hdr, "rtptime=");
+        if (!p)
+            return;
+        p = strchr(p, '=') + 1;
+        rtptime = strtoul(p, NULL, 0);
+    }
     debug(1, "Received seq: %04X, rtptime: %lu\n", seq, rtptime);
     player_flush(seq, rtptime);
 
