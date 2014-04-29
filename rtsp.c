@@ -462,6 +462,7 @@ static void handle_record(rtsp_conn_info *conn,
                          rtsp_message *req, rtsp_message *resp) {
     int seq = -1;
     unsigned long rtptime = 0;
+    int rtp_mode = 0;
     char *hdr = msg_get_header(req, "RTP-Info");
     if (hdr) {
         char *p;
@@ -475,8 +476,10 @@ static void handle_record(rtsp_conn_info *conn,
             return;
         p = strchr(p, '=') + 1;
         rtptime = strtoul(p, NULL, 0);
+        rtp_mode = 1;
     }
     debug(1, "Received seq: %04X, rtptime: %lu\n", seq, rtptime);
+    rtp_record(rtp_mode);
     player_flush(seq, rtptime);
 
     char *resphdr = malloc(10);
