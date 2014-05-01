@@ -41,7 +41,8 @@
 static void log_setup();
 
 static int shutting_down = 0;
-void shairport_shutdown(void) {
+
+void shairport_shutdown(int retval) {
     if (shutting_down)
         return;
     shutting_down = 1;
@@ -52,13 +53,13 @@ void shairport_shutdown(void) {
         config.output->deinit();
     daemon_exit(); // This does nothing if not in daemon mode
 
-    exit(0);
+    exit(retval);
 }
 
 static void sig_ignore(int foo, siginfo_t *bar, void *baz) {
 }
 static void sig_shutdown(int foo, siginfo_t *bar, void *baz) {
-    shairport_shutdown();
+    shairport_shutdown(0);
 }
 
 static void sig_child(int foo, siginfo_t *bar, void *baz) {
@@ -86,24 +87,29 @@ void usage(char *progname) {
     printf("    -h, --help          show this help\n");
     printf("    -p, --port=PORT     set RTSP listening port\n");
     printf("    -a, --name=NAME     set advertised name\n");
-    printf("    -b FILL             set how full the buffer must be before audio output\n");
-    printf("                        starts. This value is in frames; default %d\n", config.buffer_start_fill);
+    printf("    -t TIME             set how much audio is delayed.\n");
+    printf("                        This value is in ms; default %d\n", config.delay/1000);
     printf("    -d, --daemon        fork (daemonise). The PID of the child process is\n");
     printf("                        written to stdout, unless a pidfile is used.\n");
     printf("    -P, --pidfile=FILE  write daemon's pid to FILE on startup.\n");
     printf("                        Has no effect if -d is not specified\n");
-    printf("    -l, --log FILE      redirect shairport's standard output to FILE\n");
-    printf("                        If --errror is not specified, it also redirects\n");
+    printf("    -l, --log=FILE      redirect shairport's standard output to FILE\n");
+    printf("                        If --error is not specified, it also redirects\n");
     printf("                        error output to FILE\n");
-    printf("    -e, --error FILE    redirect shairport's standard error output to FILE\n");
+    printf("    -e, --error=FILE    redirect shairport's standard error output to FILE\n");
     printf("    -B, --on-start=COMMAND  run a shell command when playback begins\n");
     printf("    -E, --on-stop=COMMAND   run a shell command when playback ends\n");
 
     printf("    -o, --output=BACKEND    select audio output method\n");
+    printf("    -m, --mdns=BACKEND      force the use of BACKEND to advertize the service\n");
+    printf("                            if no mdns provider is specified,\n");
+    printf("                            shairport tries them all until one works.\n");
 
     printf("    -n, --no-mdns       don't publish via Multicast DNS\n");
     printf("    -H, --hw-addr=ADDR  use ADDR as hardware address\n");
 
+    printf("\n");
+    mdns_ls_backends();
     printf("\n");
     audio_ls_outputs();
 }
@@ -125,12 +131,13 @@ int parse_options(int argc, char **argv) {
         {"on-stop", required_argument,  NULL, 'E'},
         {"no-mdns", no_argument,        NULL, 'n'},
         {"hw-addr", required_argument,  NULL, 'H'},
+        {"mdns",    required_argument,  NULL, 'm'},
         {NULL, 0, NULL, 0}
     };
 
     int opt;
     while ((opt = getopt_long(argc, argv,
-                              "+hdvnP:l:e:p:a:o:b:B:E:H:",
+                              "+hdvnP:l:e:p:a:o:b:t:B:E:m:H:",
                               long_options, NULL)) > 0) {
         int i, len;
         switch (opt) {
@@ -153,8 +160,8 @@ int parse_options(int argc, char **argv) {
             case 'o':
                 config.output_name = optarg;
                 break;
-            case 'b':
-                config.buffer_start_fill = atoi(optarg);
+            case 't':
+                config.delay = atoi(optarg) * 1000;
                 break;
             case 'B':
                 config.cmd_start = optarg;
@@ -184,6 +191,9 @@ int parse_options(int argc, char **argv) {
                     warn("passed hardware address of %d bytes, wanted %d", len, sizeof(config.hw_addr) * 2);
                 }
                 break;
+            case 'm':
+                config.mdns_name = optarg;
+                break;
         }
     }
     return optind;
@@ -209,6 +219,7 @@ void signal_setup(void) {
     sa.sa_sigaction = &sig_ignore;
     sigaction(SIGUSR1, &sa, NULL);
 
+    sa.sa_flags = SA_SIGINFO | SA_RESTART;
     sa.sa_sigaction = &sig_shutdown;
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
@@ -216,7 +227,6 @@ void signal_setup(void) {
     sa.sa_sigaction = &sig_logrotate;
     sigaction(SIGHUP, &sa, NULL);
 
-    sa.sa_flags = SA_SIGINFO;
     sa.sa_sigaction = &sig_child;
     sigaction(SIGCHLD, &sa, NULL);
 }
@@ -263,7 +273,7 @@ int main(int argc, char **argv) {
     memset(&config, 0, sizeof(config));
 
     // set defaults
-    config.buffer_start_fill = 220;
+    config.delay = 2205000; //todo: check with an airport express what this should be
     config.port = 5002;
     char hostname[100];
     gethostname(hostname, 100);
@@ -304,6 +314,6 @@ int main(int argc, char **argv) {
     rtsp_listen_loop();
 
     // should not.
-    shairport_shutdown();
+    shairport_shutdown(1);
     return 1;
 }

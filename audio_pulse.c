@@ -48,14 +48,13 @@ static int init(int argc, char **argv) {
     char *pa_server = NULL;
     char *pa_sink = NULL;
     char *pa_appname = config.apname;
-    
+
     optind = 1; // optind=0 is equivalent to optind=1 plus special behaviour
     argv--;     // so we shift the arguments to satisfy getopt()
     argc++;
 
     // some platforms apparently require optreset = 1; - which?
     int opt;
-    char *mid;
     while ((opt = getopt(argc, argv, "a:s:n:")) > 0) {
         switch (opt) {
             case 'a':
@@ -74,7 +73,7 @@ static int init(int argc, char **argv) {
     }
 
     if (optind < argc)
-        die("Invalid audio argument: %s", argv[optind]); 
+        die("Invalid audio argument: %s", argv[optind]);
 
     static const pa_sample_spec ss = {
             .format = PA_SAMPLE_S16LE,
@@ -117,6 +116,18 @@ static void stop(void) {
         fprintf(stderr, __FILE__": pa_simple_drain() failed: %s\n", pa_strerror(pa_error));
 }
 
+static long long get_delay() {
+  pa_usec_t latency = (pa_usec_t) -1;
+  pa_simple_get_latency(pa_dev, &pa_error);
+  if (pa_error < 0 )
+  {
+    latency = (pa_usec_t) 0;
+    fprintf(stderr, __FILE__": get_delay() failed: %s\n", pa_strerror(pa_error));
+  }
+
+  return (long long)latency;
+}
+
 audio_output audio_pulse = {
     .name = "pulse",
     .help = &help,
@@ -125,5 +136,7 @@ audio_output audio_pulse = {
     .start = &start,
     .stop = &stop,
     .play = &play,
-    .volume = NULL
+    .volume = NULL,
+    .get_delay = &get_delay
 };
+

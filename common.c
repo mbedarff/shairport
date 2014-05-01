@@ -42,18 +42,18 @@ int debuglev = 0;
 
 void die(char *format, ...) {
     fprintf(stderr, "FATAL: ");
-    
+
     va_list args;
     va_start(args, format);
 
     vfprintf(stderr, format, args);
     if (config.daemonise)
         daemon_fail(format, args); // Send error message to parent
-    
+
     va_end(args);
-    
+
     fprintf(stderr, "\n");
-    shairport_shutdown();
+    shairport_shutdown(1);
 }
 
 void warn(char *format, ...) {

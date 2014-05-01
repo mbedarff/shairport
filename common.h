@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <sys/socket.h>
 #include "audio.h"
+#include "mdns.h"
 
 // struct sockaddr_in6 is bigger than struct sockaddr. derp
 #ifdef AF_INET6
@@ -23,9 +24,10 @@ typedef struct {
     int port;
     char *output_name;
     audio_output *output;
-    int buffer_start_fill;
+    char *mdns_name;
+    mdns_backend *mdns;
+    int delay;
     int daemonise;
-    int mdns_internal;
     char *cmd_start, *cmd_stop;
     char *pidfile;
     char *logfile;
@@ -47,7 +49,7 @@ uint8_t *rsa_apply(uint8_t *input, int inlen, int *outlen, int mode);
 
 extern shairport_cfg config;
 
-void shairport_shutdown(void);
+void shairport_shutdown(int retval);
 void shairport_startup_complete(void);
 
 #endif // _COMMON_H

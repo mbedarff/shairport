@@ -40,6 +40,7 @@ static void start(int sample_rate);
 static void play(short buf[], int samples);
 static void stop(void);
 static void volume(double vol);
+static long long get_delay(void);
 
 audio_output audio_alsa = {
     .name = "alsa",
@@ -49,7 +50,8 @@ audio_output audio_alsa = {
     .start = &start,
     .stop = &stop,
     .play = &play,
-    .volume = NULL
+    .volume = NULL,
+    .get_delay = &get_delay
 };
 
 static snd_pcm_t *alsa_handle = NULL;
@@ -65,6 +67,8 @@ static char *alsa_mix_dev = NULL;
 static char *alsa_mix_ctrl = "Master";
 static int alsa_mix_index = 0;
 
+static int device_sample_rate;
+
 static void help(void) {
     printf("    -d output-device    set the output device [default*|...]\n"
            "    -t mixer-type       set the mixer type [software*|hardware]\n"
@@ -77,7 +81,7 @@ static void help(void) {
 
 static int init(int argc, char **argv) {
     int hardware_mixer = 0;
-    
+
     optind = 1; // optind=0 is equivalent to optind=1 plus special behaviour
     argv--;     // so we shift the arguments to satisfy getopt()
     argc++;
@@ -106,20 +110,20 @@ static int init(int argc, char **argv) {
                 die("Invalid audio option -%c specified", opt);
         }
     }
-    
+
     if (optind < argc)
         die("Invalid audio argument: %s", argv[optind]);
-        
+
     if (!hardware_mixer)
         return 0;
-        
+
     if (alsa_mix_dev == NULL)
         alsa_mix_dev = alsa_out_dev;
     audio_alsa.volume = &volume;
-    
+
     int ret = 0;
     long alsa_mix_maxv;
-    
+
     snd_mixer_selem_id_alloca(&alsa_mix_sid);
     snd_mixer_selem_id_set_index(alsa_mix_sid, alsa_mix_index);
     snd_mixer_selem_id_set_name(alsa_mix_sid, alsa_mix_ctrl);
@@ -139,7 +143,7 @@ static int init(int argc, char **argv) {
         die ("Failed to find mixer element");
     snd_mixer_selem_get_playback_volume_range (alsa_mix_elem, &alsa_mix_minv, &alsa_mix_maxv);
     alsa_mix_range = alsa_mix_maxv - alsa_mix_minv;
-    
+
     return 0;
 }
 
@@ -153,13 +157,14 @@ static void deinit(void) {
 static void start(int sample_rate) {
     if (sample_rate != 44100)
         die("Unexpected sample rate!");
-    
+    device_sample_rate = sample_rate;
+
     int ret, dir = 0;
     snd_pcm_uframes_t frames = 64;
     ret = snd_pcm_open(&alsa_handle, alsa_out_dev, SND_PCM_STREAM_PLAYBACK, 0);
     if (ret < 0)
         die("Alsa initialization failed: unable to open pcm device: %s\n", snd_strerror(ret));
-        
+
     snd_pcm_hw_params_alloca(&alsa_params);
     snd_pcm_hw_params_any(alsa_handle, alsa_params);
     snd_pcm_hw_params_set_access(alsa_handle, alsa_params, SND_PCM_ACCESS_RW_INTERLEAVED);
@@ -193,3 +198,19 @@ static void volume(double vol) {
     if(snd_mixer_selem_set_playback_volume_all(alsa_mix_elem, alsa_volume) != 0)
         die ("Failed to set playback volume");
 }
+
+static long long get_delay(void) {
+  snd_pcm_sframes_t frames = 0;
+  snd_pcm_delay(alsa_handle, &frames);
+
+  if (frames < 0)
+  {
+#if SND_LIB_VERSION >= 0x000901 /* snd_pcm_forward() exists since 0.9.0rc8 */
+    snd_pcm_forward(alsa_handle, -frames);
+#endif
+    frames = 0;
+  }
+
+  return (long long)(frames * 1000000L / device_sample_rate);
+}
+
