@@ -77,7 +77,7 @@ Contributors to version 0.x
 ---------------------------
 * [James Laird](mailto:jhl@mafipulation.org), author
 * [David Hammerton](http://craz.net/), ALAC decoder
-* [Albert Zeyer](http://www.az2000.de), old maintainer
+* [Albert Zeyer](http://www.az2000.de), maintainer
 * [Preston Marshall](mailto:preston@synergyeoc.com)
 * [Mads Mætzke Tandrup](mailto:mads@tandrup.org)
 * [Martin Spasov](mailto:mspasov@gmail.com)
