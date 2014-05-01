@@ -55,7 +55,26 @@ static const int host_bigendian = 0;
 struct {signed int x:24;} se_struct_24;
 #define SignExtend24(val) (se_struct_24.x = val)
 
-void allocate_buffers(alac_file *alac)
+void alac_free(alac_file *alac) {
+    if (alac->predicterror_buffer_a)
+        free(alac->predicterror_buffer_a);
+    if (alac->predicterror_buffer_b)
+        free(alac->predicterror_buffer_b);
+
+    if (alac->outputsamples_buffer_a)
+        free(alac->outputsamples_buffer_a);
+    if (alac->outputsamples_buffer_b)
+        free(alac->outputsamples_buffer_b);
+
+    if (alac->uncompressed_bytes_buffer_a)
+        free(alac->uncompressed_bytes_buffer_a);
+    if (alac->uncompressed_bytes_buffer_b)
+        free(alac->uncompressed_bytes_buffer_b);
+
+    free(alac);
+}
+
+void alac_allocate_buffers(alac_file *alac)
 {
     alac->predicterror_buffer_a = malloc(alac->setinfo_max_samples_per_frame * 4);
     alac->predicterror_buffer_b = malloc(alac->setinfo_max_samples_per_frame * 4);
@@ -110,7 +129,7 @@ void alac_set_info(alac_file *alac, char *inputbuffer)
   if (!host_bigendian)
       _Swap32(alac->setinfo_8a_rate);
 
-  allocate_buffers(alac);
+  alac_allocate_buffers(alac);
 
 }
 
@@ -687,9 +706,9 @@ static void deinterlace_24(int32_t *buffer_a, int32_t *buffer_b,
 
 }
 
-void decode_frame(alac_file *alac,
-                  unsigned char *inbuffer,
-                  void *outbuffer, int *outputsize)
+void alac_decode_frame(alac_file *alac,
+                       unsigned char *inbuffer,
+                       void *outbuffer, int *outputsize)
 {
     int channels;
     int32_t outputsamples = alac->setinfo_max_samples_per_frame;
@@ -1104,9 +1123,11 @@ void decode_frame(alac_file *alac,
     }
 }
 
-alac_file *create_alac(int samplesize, int numchannels)
+alac_file *alac_create(int samplesize, int numchannels)
 {
     alac_file *newfile = malloc(sizeof(alac_file));
+
+    memset(newfile, 0, sizeof(alac_file));
 
     newfile->samplesize = samplesize;
     newfile->numchannels = numchannels;
